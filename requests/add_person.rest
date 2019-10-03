@@ -1,0 +1,7 @@
+POST https://glacial-dusk-84628.herokuapp.com/api/persons
+Content-Type: application/json
+
+{
+    "name": "lkjh",
+    "number": "0983490856046"
+}
