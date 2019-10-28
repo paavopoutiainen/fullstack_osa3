@@ -1,12 +1,14 @@
+//otetaan dotenv kirjasto käyttöön, pitää ottaa käyttöön ennen modelien importtaamista
+//jotta .env:ssä määritellyt ympäristömuuttujat olisivat moduulien käytössä
+require('dotenv').config()
 const express = require('express')
 const app = express()
+app.use(express.static('build'))
+//middleware, joka parsii requestistä bodyn 
 const bodyParser = require('body-parser')
 var morgan = require('morgan')
-const cors = require('cors')
-
-
-app.use(express.static('build'))
-app.use(cors())
+const Person = require("./models/person.js")
+//parsitaan pelkkä json ja etsii vain niitä requestejä, joiden content-type on json
 app.use(bodyParser.json())
 
 morgan.token("postData", function(req) {
@@ -15,82 +17,88 @@ morgan.token("postData", function(req) {
 app.use(morgan(':method :url :status :response-time ms :postData'))
 
 
-
-
-
-let persons = [
-    {
-        name: "Paavo",
-        number: "9057846954",
-        id: 1  
-    },
-    {
-        name: "Mikko",
-        number: "093459043",
-        id: 2
-    }
-]
-
-
 //apin info
 app.get("/info", (req, res) => {
-    res.send(`<p>Phonebook has info for ${persons.length} people</p>
-    <p>${Date()}</p>`)
+    Person.find({})
+    .then(result => {
+        res.send(`<p>Phonebook has info for ${result.length} people</p>
+        <p>${Date()}</p>`)
+    })
+    
 })
 
 //GET all
 app.get("/api/persons", (req, res) => {
-    res.json(persons)
+    Person.find({}).then(persons =>{
+        res.json(persons.map(person => person.toJSON()))
+    })
 })
 //GET one
-app.get("/api/persons/:id", (req, res) => {
-    console.log("hellou")
-    const id = Number(req.params.id)
-    const person = persons.find(person => person.id === id)
-    if(person) {
-        res.json(person)
-      } else {
-        res.status(404).end()
-      }
+app.get("/api/persons/:id", (req, res, next) => {
+    //finding the person from the mongodb using the id in the request.params and findByID method
+    Person.findById(req.params.id).then(person => {
+        if(person){
+            res.json(person)
+        } else {
+            res.status(404).end()
+        }
+    })
+    .catch(error => next(error))
 })
 
-
 //adding a connection
-app.post("/api/persons", (req, res) => {
+app.post("/api/persons", (req, res, next) => {
     
     const body = req.body
 
-    const id = Math.floor(Math.random() * 10000)
-    if(!body.name || !body.number){
+    /*if(!body.name || !body.number){
         return res.status(400).json({
-            error: "Content missing"
+            error: "Content miiiissing"
         })
     } 
-    if(persons.some(p => p.name.toLowerCase() === body.name.toLowerCase())){
-        return res.status(400).json({
-            error: "name must be unique"
-        })
-    }
-
-
-    const person = {
+   */
+    const person = new Person({
         name: body.name,
-        number: body.number,
-        id: id
-    }
-    persons = persons.concat(person)
+        number: body.number
+    })
+    
+    person.save()
+    .then(savedPerson => savedPerson.toJSON())
+    .then(savedAndFormattedPerson => res.status(200).json(savedAndFormattedPerson))
+    .catch(error => next(error))
+})
+//updating the person, this is requested from frontend when the name of the to be added person already exists
+//
+app.put("/api/persons/:id", (req, res, next)=> {
+    const body = req.body
 
-    res.json(person)
+    const update = {number: body.number}
+
+    Person.findByIdAndUpdate(req.params.id, update, {new: true})
+        .then(result => {
+       
+        res.json(result.toJSON())
+    })
+    .catch(error => next(error))
 })
 
+
+
 //DELETE
-app.delete("/api/persons/:id", (req, res) => {
+app.delete("/api/persons/:id", (req, res, next) => {
     console.log("hellou")
-    const id = Number(req.params.id)
-
-    persons = persons.filter(person => person.id !== id)
-
-    res.status(204).end()
+    Person.findByIdAndRemove(req.params.id)
+        .then(result => {
+            if(result){
+                console.log(result)
+                res.status(204).end()
+            } else {
+                res.status(404).end()
+            }
+           
+           
+        })
+        .catch(error => next(error))
 })
 
 const unknownEndpoint = (request, response) => {
@@ -99,8 +107,26 @@ const unknownEndpoint = (request, response) => {
   
 app.use(unknownEndpoint)
 
-const PORT = process.env.PORT || 3001
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`)
+const errorHandler = (error, request, response, next) => {
+    console.log("täällä1:", error)
+    console.log("hellou", error.errors.number)
+    
+    
+  
+    if (error.name === 'CastError' && error.kind == 'ObjectId') {
+      return response.status(400).send({ error: 'malformatted id' })
+    } else if (error.name ==="ValidationError" ){
+        return response.status(400).json({error: error.message})
+    } 
+  
+    next(error)
+  }
+  
+app.use(errorHandler)
+
+
+const port = 3001
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`)
 })
 
