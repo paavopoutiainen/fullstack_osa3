@@ -1,12 +1,14 @@
 //use mongoose library
-const mongoose = require('mongoose')
-const uniqueValidator = require("mongoose-unique-validator");
+const mongoose = require("mongoose")
+const uniqueValidator = require("mongoose-unique-validator")
 
 //get the url for database
+// eslint-disable-next-line no-undef
 let url = process.env.MONGODB_URI
 
 //connect to the database
-mongoose.connect(url, {useNewUrlParser: true, useUnifiedTopology: true})
+mongoose.connect(url, { useNewUrlParser: true, useUnifiedTopology: true })
+    // eslint-disable-next-line no-unused-vars
     .then(result => {
         console.log("connected to mongoDb")
     })
@@ -26,7 +28,7 @@ const personSchema = new mongoose.Schema({
         minlength: 8,
         required: true
     }
-})    
+})
 
 personSchema.set("toJSON", {
     transform: (document, returnedObject) => {
@@ -36,7 +38,7 @@ personSchema.set("toJSON", {
     }
 })
 
-personSchema.plugin(uniqueValidator);
+personSchema.plugin(uniqueValidator)
 
 module.exports = mongoose.model("Person", personSchema)
 
